@@ -1,0 +1,3 @@
+interface:
+  display_name: "Compile AGENTS Context"
+  short_description: "Generate or refresh AGENTS.md project context"

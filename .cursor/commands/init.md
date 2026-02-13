@@ -19,18 +19,21 @@ args:
 # AGENTS.md Context Compilation
 
 Create and maintain AGENTS.md - a living document of project context and agent ecosystem.
+This command is backed by the Codex skill `compile-agents-context`.
 
 ## Process
 
 1. Analyze project holistically (structure, purpose, tech stack, patterns)
 2. Discover and catalog all agents and skills
 3. Extract conventions (coding standards, architectural patterns, testing, deployment)
-4. Generate AGENTS.md following structure in `.cursor/skills/context-compilation-guide/SKILL.md`
+4. Generate AGENTS.md following structure in `.codex/skills/compile-agents-context/SKILL.md`
 5. Create cursor rule for auto-maintenance if `auto_watch` is true
 
 ## Reference
 
-For detailed guidance, refer to the **context-compilation-guide** skill at `.cursor/skills/context-compilation-guide/SKILL.md`. It includes:
+For detailed guidance, refer to the **compile-agents-context** Codex skill at `.codex/skills/compile-agents-context/SKILL.md`.
+For extended template guidance, also refer to the **context-compilation-guide** skill at `.agents/skills/context-compilation-guide/SKILL.md`.
+These skills include:
 - Complete project analysis process
 - AGENTS.md structure template
 - Context update decision logic
