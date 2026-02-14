@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bounded Context Implementation Guide"
+  short_description: "Implement code using bounded-context module structure"
+  default_prompt: "Implement or refactor code to match docs/bounded-context-structure.md"
