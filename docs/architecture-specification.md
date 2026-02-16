@@ -46,7 +46,7 @@ Responsibilities:
 - Track webhook delivery attempts, retries, and dead-letter outcomes.
 - Persist webhook endpoint configuration and event/audit records.
 
-### 4) Workers (`apps/async_tasks`) - Event Subscribers / Command Runners
+### 4) Workers (`apps/workers`) - Event Subscribers / Command Runners
 Responsibilities:
 - Subscribe to RabbitMQ queues per use case.
 - Execute background workflows (provider sync, risk checks, notifications, status recalculation).
