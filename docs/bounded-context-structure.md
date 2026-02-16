@@ -178,6 +178,7 @@ Optional folder for code shared across modules **within one bounded context**.
 ## Directory Structure (Template)
 
 The codebase can use a **flat per-layer layout** within each module (e.g., `entities.py`, `events.py`, `value_objects.py`) instead of one file per entity.
+If using an ORM, keep model mappings in the owning module's `infrastructure/adapters/` folder (do not use a top-level `persistence/` folder inside the bounded context).
 
 ```text
 src/<bounded_context_name>/
@@ -192,6 +193,7 @@ src/<bounded_context_name>/
 │   │   └── services/
 │   └── infrastructure/
 │       ├── adapters/
+│       │   └── orm_models.py
 │       └── subscribers/
 ├── <module_b>/
 │   ├── domain/
@@ -203,6 +205,7 @@ src/<bounded_context_name>/
 │   │   └── services/
 │   └── infrastructure/
 │       ├── adapters/
+│       │   └── orm_models.py
 │       └── subscribers/
 ├── <module_c>/
 │   ├── domain/
@@ -215,7 +218,6 @@ src/<bounded_context_name>/
 │   │   └── services/
 │   └── infrastructure/
 │       └── adapters/
-├── persistence/
-│   └── models.py
+│           └── orm_models.py
 └── shared/
     └── domain/
