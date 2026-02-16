@@ -21,6 +21,7 @@ This document defines the MVP architecture and technology stack for the credit a
 ### 1) Backend (`apps/backend`) - FastAPI
 Responsibilities:
 - Expose REST APIs for creating, reading, listing, and updating applications.
+- Expose `POST /auth/login`, validate bearer JWT tokens on `/api/*`, and enforce RBAC/ownership checks.
 - Execute synchronous validations and orchestration for immediate request flows.
 - Persist source-of-truth application data in PostgreSQL.
 - Publish integration events to RabbitMQ after relevant domain changes.
@@ -59,9 +60,10 @@ Responsibilities:
 - Message Broker: RabbitMQ
 - Primary Database: PostgreSQL
 - Cache/Rate Control: Redis
+- Auth Strategy: JWT access tokens + PostgreSQL-backed RBAC (roles and permissions)
 
 ## Data Model (Starting Point)
-The diagram below uses your base classes (`Application`, `BankingData`, `Status`, `Workflow`, `Operation`, `Countries`) and adds webhook/worker models required for complete async and integration flows.
+The diagram below uses your base classes (`Application`, `BankingData`, `Status`, `Workflow`, `Operation`, `Countries`) and adds webhook/worker plus authentication/RBAC models required for complete async and protected API flows.
 
 ```mermaid
 classDiagram
@@ -78,6 +80,7 @@ classDiagram
 
   class Application {
     +UUID id
+    +UUID user_id
     +Countries country
     +string full_name
     +string identity_document
@@ -174,6 +177,38 @@ classDiagram
     +datetime processed_at
   }
 
+  class AuthUser {
+    +UUID id
+    +string email
+    +string password_hash
+    +bool is_active
+    +datetime created_at
+    +datetime updated_at
+    +datetime last_login_at
+  }
+
+  class AuthRole {
+    +UUID id
+    +string code
+    +string description
+  }
+
+  class AuthPermission {
+    +UUID id
+    +string code
+    +string description
+  }
+
+  class AuthUserRole {
+    +UUID user_id
+    +UUID role_id
+  }
+
+  class AuthRolePermission {
+    +UUID role_id
+    +UUID permission_id
+  }
+
   class WebhookEndpoint {
     +UUID id
     +string direction
@@ -206,6 +241,7 @@ classDiagram
   }
 
   Application "1" *-- "0..*" BankingData : has
+  Application "0..*" --> "1" AuthUser : owner
   Application "1" --> "1" Status : current
   Application "1" --> "1" Countries : country
   Countries "1" --> "0..1" Workflow : workflow (current invariant)
@@ -220,6 +256,10 @@ classDiagram
   WorkerJob "0..*" --> "1" Operation : runs
   WorkerJob "0..*" --> "0..1" SubOperation : current step
   EventConsumption "0..*" --> "1" OutboxEvent : consumes
+  AuthUser "1" --> "0..*" AuthUserRole : assignments
+  AuthRole "1" --> "0..*" AuthUserRole : assigned_to_users
+  AuthRole "1" --> "0..*" AuthRolePermission : grants
+  AuthPermission "1" --> "0..*" AuthRolePermission : permission_entries
   WebhookEvent "0..*" --> "1" WebhookEndpoint : endpoint
   WebhookEvent "0..*" --> "0..1" Application : related application
   WebhookEvent "1" *-- "0..*" WebhookDeliveryAttempt : delivery attempts
@@ -236,12 +276,19 @@ classDiagram
 - `Application.current_status_id` is initialized from `Status(is_initial=true)` of the matched country workflow.
 - Valid next statuses are defined by the `Status -> Status` `allowed_transitions` relation within the same workflow.
 - Terminal statuses (`is_terminal=true`) must have zero outgoing `allowed_transitions` relations.
+- `Application.user_id` is required and references `AuthUser.id` to enforce customer ownership rules.
+- `AuthUser.email` is unique and case-insensitive (CITEXT).
+- `AuthRole.code` and `AuthPermission.code` are unique.
+- `AuthUserRole` is unique per `(user_id, role_id)`.
+- `AuthRolePermission` is unique per `(role_id, permission_id)`.
 
 ### Model Clarifications
 - `WebhookEndpoint.country` is required. Each endpoint is configured for exactly one country.
 - `OutboxEvent` is the durable integration-event record created in the same DB transaction as domain changes; a publisher process reads pending outbox rows and sends them to RabbitMQ.
 - `EventConsumption` is the consumer-side idempotency/audit record; it stores processed message IDs per consumer/queue to prevent duplicate side effects.
 - `allowed_transitions` is modeled as a self-relation on `Status`; in persistence it can be represented by a join table (`status_transition`) with `from_status_id` and `to_status_id`.
+- `AuthUser.password_hash` stores hashed credentials only (never plaintext); password comparison happens through dedicated auth services.
+- JWT claims are minimized to identity and authorization attributes required for request authorization (`sub`, `roles`, `permissions`, `iat`, `exp`, `iss`, `aud`).
 - `SubOperation.execution_type` supports the current operation types:
   - `QUERY_USE_CASE`
   - `COMMAND_USE_CASE`
@@ -253,6 +300,7 @@ classDiagram
 
 ### Ownership and Write Paths
 - Backend writes: `Application`, `BankingData`, `Workflow`/`Status`/`Operation`/`SubOperation`/`SubOperationTrigger` metadata, `OutboxEvent`, and read projections.
+- Auth infrastructure adapters in `src/auth` write: `AuthUser` and RBAC tables (`AuthRole`, `AuthPermission`, `AuthUserRole`, `AuthRolePermission`); `apps/backend` provides transport wiring and runtime composition.
 - Workers write: `WorkerJob` and `EventConsumption`. If async logic requires status changes, workers emit commands/events and the backend application service applies the `Application` transition (single writer rule).
 - Webhooks write: `WebhookEndpoint` config, `WebhookEvent`, and `WebhookDeliveryAttempt`. Webhooks do not write `Application` state directly; they publish normalized events/commands.
 - Frontend reads backend projections/materialized views only (no direct table writes).
@@ -262,6 +310,7 @@ classDiagram
 ### PostgreSQL
 Use as system of record for:
 - Applications
+- Auth users, roles, permissions, and role assignments
 - Status history / audit trail
 - Provider snapshots/references
 - Workflow and operation definitions
@@ -276,6 +325,11 @@ Recommended patterns:
 - Enforce one-workflow-per-country with a unique constraint/index on `workflow.country`.
 - Enforce one-initial-status-per-workflow with a unique partial index on `status(workflow_id)` where `is_initial=true`.
 - If using a join table for the self-relation, enforce unique transition edges with a unique index on `status_transition(from_status_id, to_status_id)`.
+- Enforce unique user identity with a case-insensitive unique index on `auth_users.email` (CITEXT).
+- Enforce unique RBAC catalogs with unique indexes on `auth_roles.code` and `auth_permissions.code`.
+- Enforce unique membership/permission edges with composite primary keys:
+  - `auth_user_roles(user_id, role_id)`
+  - `auth_role_permissions(role_id, permission_id)`
 
 ### RabbitMQ
 Use for:
@@ -293,6 +347,37 @@ Use for:
 - Read-model caching for frequently queried lists/details.
 - Request throttling and anti-abuse controls.
 - Short-lived distributed locks/idempotency keys for workers.
+
+## Authentication and Authorization Specifications (MVP)
+### Endpoint Protection
+- `POST /auth/login` accepts `email` + `password` and returns JWT access tokens for valid, active users.
+- All `/api/*` endpoints require `Authorization: Bearer <token>`.
+- Invalid, expired, or malformed tokens are rejected with `401`.
+
+### JWT and Principal Model
+- JWT required claims: `sub`, `roles`, `permissions`, `iat`, `exp`, `iss`, `aud`.
+- Principal identity is derived from `sub` and used for ownership checks (`Application.user_id == principal.user_id`).
+- Tokens must exclude unnecessary PII (for example email, identity document, income, provider payloads).
+
+### RBAC Matrix (MVP)
+Permission catalog:
+- `applications:create`
+- `applications:list_own`
+- `applications:list_all`
+- `applications:update_customer`
+- `users:manage_operations`
+- `workflows:manage`
+
+Role mapping:
+- `customer`: `applications:create`, `applications:list_own`
+- `operation`: `applications:list_all`, `applications:update_customer`
+- `admin`: `applications:list_all`, `users:manage_operations`, `workflows:manage`
+
+Guard semantics:
+- No implicit role inheritance; access is permission-driven.
+- `customer` list/read operations are always owner-scoped.
+- `operation` may list all applications and update customer applications through `applications:update_customer`.
+- `admin` operations outside user/workflow management require explicit permission grants.
 
 ## End-to-End Flow (MVP)
 1. Frontend submits application to backend.
@@ -318,7 +403,7 @@ Use for:
 5. Final delivery status is persisted to `WebhookEvent`/audit records.
 
 ## Cross-Cutting Requirements
-- Security: authN/authZ at API and webhook edges, signed webhook verification.
+- Security: `POST /auth/login`, bearer authN on `/api/*`, explicit RBAC + ownership checks, signed webhook verification, and sensitive-data minimization in tokens/logs.
 - Reliability: at-least-once delivery assumptions, idempotent handlers, DLQ monitoring.
 - Observability: correlation IDs, structured logs, queue/consumer metrics, tracing.
 - Scalability: horizontal scale for backend/webhooks/workers; independent queue scaling.
@@ -335,3 +420,5 @@ Use for:
 - Exact country/provider strategy contract and versioning policy.
 - Redis deployment mode (single node vs highly available).
 - WebSocket/Socket.IO channel fan-out strategy for multi-instance backend deployments.
+- JWT key management and rotation approach beyond MVP `HS256`.
+- Refresh token/revocation strategy (post-MVP).
