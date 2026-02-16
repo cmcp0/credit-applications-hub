@@ -241,18 +241,18 @@ Redirect algorithm:
 ### Task Checklist (living tracker)
 | ID | Task | Path(s) | Status | Notes |
 |---|---|---|---|---|
-| F1 | Scaffold frontend auth and dashboard route modules | `apps/frontend/src/**` | TODO | Match proposed layout |
-| F2 | Implement login form and submit UX | `apps/frontend/src/features/auth/components/login_form.vue`, `apps/frontend/src/features/auth/views/login_page.vue` | TODO | Handle 401/403/429 states |
-| F3 | Implement auth API client and token decode helpers | `apps/frontend/src/features/auth/api/auth_api.ts`, `apps/frontend/src/features/auth/model/auth_types.ts` | TODO | Validate backend response contract and build `AuthSessionState` from JWT claims |
-| F4 | Implement session persistence and bootstrap | `apps/frontend/src/features/auth/store/auth_store.ts`, `apps/frontend/src/features/auth/services/token_storage.ts`, `apps/frontend/src/app/bootstrap/auth_bootstrap.ts` | TODO | Use `sessionStorage`; validate shape/expiry and clear invalid state |
-| F5 | Implement route guards and role redirect utility | `apps/frontend/src/app/router/auth_guards.ts`, `apps/frontend/src/features/auth/services/role_redirect.ts` | TODO | Enforce deterministic role priority with permission-aware dashboard target resolution |
-| F6 | Create role dashboard shell pages | `apps/frontend/src/features/dashboards/*.vue` | TODO | Initial MVP shells are sufficient |
-| F7 | Add forbidden page and unauthorized handling UX | `apps/frontend/src/shared/ui/forbidden_page.vue` | TODO | No sensitive backend details |
-| F8 | Wire logout behavior and auth error recovery | `apps/frontend/src/features/auth/store/auth_store.ts`, API client interceptors | TODO | `401` clears session and redirects `/login`; protected API `403` routes to `/forbidden`; login `403 USER_INACTIVE` stays inline |
-| F9 | Add root/login redirect handling | `apps/frontend/src/app/router/auth_guards.ts` | TODO | `/` and authenticated `/login` must resolve to role dashboard |
-| FT1 | Unit tests for redirect and token/session utilities | `tests/frontend/unit/auth/**` | TODO | Include multi-role priority behavior |
-| FT2 | Integration tests for router guards and login flows | `tests/frontend/integration/auth/**` | TODO | Cover unauthorized/forbidden paths and `403` disambiguation (login vs protected APIs) |
-| FT3 | E2E tests for role-based dashboard entry | `tests/frontend/e2e/auth/**` | TODO | `customer`, `operation`, `admin` happy paths |
+| F1 | Scaffold frontend auth and dashboard route modules | `apps/frontend/src/**` | DONE | Vue app baseline, auth modules, router, and dashboard shells created |
+| F2 | Implement login form and submit UX | `apps/frontend/src/features/auth/components/login_form.vue`, `apps/frontend/src/features/auth/views/login_page.vue` | DONE | Required field validation, loading disable, and `401/403/429` mapping implemented |
+| F3 | Implement auth API client and token decode helpers | `apps/frontend/src/features/auth/api/auth_api.ts`, `apps/frontend/src/features/auth/model/auth_types.ts` | DONE | Login contract validation + JWT claim decoding + `AuthSessionState` builder implemented |
+| F4 | Implement session persistence and bootstrap | `apps/frontend/src/features/auth/store/auth_store.ts`, `apps/frontend/src/features/auth/services/token_storage.ts`, `apps/frontend/src/app/bootstrap/auth_bootstrap.ts` | DONE | `sessionStorage` key `auth_session` with shape/expiry validation and bootstrap hydration implemented |
+| F5 | Implement route guards and role redirect utility | `apps/frontend/src/app/router/auth_guards.ts`, `apps/frontend/src/features/auth/services/role_redirect.ts` | DONE | Deterministic priority (`admin > operation > customer`) with permission-aware resolution implemented |
+| F6 | Create role dashboard shell pages | `apps/frontend/src/features/dashboards/*.vue` | DONE | Customer/operation/admin dashboard pages and shared shell implemented |
+| F7 | Add forbidden page and unauthorized handling UX | `apps/frontend/src/shared/ui/forbidden_page.vue` | DONE | `/forbidden` page implemented with authenticated/unauthenticated recovery actions |
+| F8 | Wire logout behavior and auth error recovery | `apps/frontend/src/features/auth/store/auth_store.ts`, `apps/frontend/src/app/bootstrap/auth_bootstrap.ts` | DONE | Logout clears session; protected API `401` clears+redirects `/login`; protected API `403` redirects `/forbidden`; login `403 USER_INACTIVE` remains inline |
+| F9 | Add root/login redirect handling | `apps/frontend/src/app/router/auth_guards.ts` | DONE | `/` and authenticated `/login` resolve via role+permission target logic |
+| FT1 | Unit tests for redirect and token/session utilities | `apps/frontend/tests/unit/auth/**` | DONE | Unit coverage added for redirect priority, token/session parsing, and login form behavior |
+| FT2 | Integration tests for router guards and login flows | `apps/frontend/tests/integration/auth/**` | DONE | Guard/login/401/403 disambiguation flows added |
+| FT3 | E2E tests for role-based dashboard entry | `apps/frontend/tests/e2e/auth/**` | DONE | Playwright scenarios for customer/operation/admin redirects and throttled login added |
 
 ## Testing Strategy
 - Unit:
@@ -279,7 +279,7 @@ Redirect algorithm:
 ## Implementation Gaps and Mitigations
 | Gap/Risk | Impact | Mitigation |
 |---|---|---|
-| Frontend app scaffold is currently empty | Implementation startup friction | Create route/store/layout baseline in first task (F1) |
+| Frontend app scaffold maturity and convention drift over time | Future onboarding friction if architecture diverges | Keep this design tracker and test suite as the contract for frontend auth/routing behavior |
 | Backend ownership filtering is deferred to applications context | Customer dashboard data-scope assumptions may drift | Keep frontend role routing independent of ownership schema; enforce backend response-driven rendering |
 | Multiple role assignment could be non-deterministic without policy | Inconsistent user landing routes | Enforce explicit role priority in `role_redirect` utility and unit tests |
 | Session token storage strategy carries XSS risk | Token exposure in compromised runtime | Use `sessionStorage`, minimize token lifetime, and follow strict frontend input/output sanitization |
