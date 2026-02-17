@@ -1,5 +1,5 @@
 <template>
-  <Card custom-class="w-full max-w-md border-border/80 bg-card/95 shadow-xl backdrop-blur">
+  <Card custom-class="w-full border-border/80 bg-card/95 shadow-xl backdrop-blur">
     <CardHeader>
       <CardTitle>Sign in</CardTitle>
       <CardDescription>Enter your account credentials to continue.</CardDescription>
