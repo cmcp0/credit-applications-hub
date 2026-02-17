@@ -3,7 +3,7 @@
 ## Metadata
 - **Related PRD**: `docs/prd-credit-applications-hub.md` (Phase 4: Hardening)
 - **Status**: draft
-- **Last Updated**: 2026-02-16
+- **Last Updated**: 2026-02-17
 - **Author**: Engineering
 - **Scope**: Login + Bearer authorization for private API services + RBAC + PII protection controls + public endpoint throttling
 
@@ -23,7 +23,7 @@ The document is implementation-tracking by design: it includes file-level tasks,
 - **Goals**:
   - Add credential-based login.
   - Enforce token-based access control on private API routes.
-  - Enforce role/permission access for customer, operation, and admin personas.
+  - Enforce role/permission access for customer, operation, and admin personas, with admin scope limited to operation-user and workflow management.
   - Secure handling of PII and avoid exposing sensitive data in tokens, logs, and API responses.
   - Throttle public service access to mitigate abuse and credential stuffing.
   - Preserve business logic boundaries in `src/auth/`.
@@ -67,13 +67,13 @@ The document is implementation-tracking by design: it includes file-level tasks,
 **Acceptance Criteria**:
 - `customer` can create applications and list only their own applications.
 - `operation` can list all applications and transition customer application status.
-- `admin` can manage operation users and workflows.
+- `admin` can manage operation users and workflows and is denied `/api/applications` access in MVP.
 
 **Functional Requirements**:
 - FR-8: The system SHALL enforce explicit permission checks for protected `/api/*` endpoints (no implicit role inheritance).
 - FR-9: The system SHALL restrict `customer` list/read operations to ownership (`application.user_id == principal.user_id`) when ownership linkage exists in the applications context.
 - FR-10: The system SHALL allow `operation` to list all applications and transition customer application status (status updates only; general field updates are out of scope for this slice).
-- FR-11: The system SHALL allow `admin` to manage operation users and workflow resources.
+- FR-11: The system SHALL allow `admin` to manage operation users and workflow resources and SHALL deny admin access to `/api/applications` routes in MVP.
 
 ### Feature 4: PII and Sensitive Data Protection
 **User Story**: As a security stakeholder, PII and sensitive fields are protected against accidental exposure.  
@@ -342,7 +342,6 @@ Role mapping:
   - `applications:list_all`
   - `applications:update_customer` (status transition scope only)
 - `admin`:
-  - `applications:list_all`
   - `users:manage_operations`
   - `workflows:manage`
 
@@ -353,10 +352,11 @@ Endpoint guard examples:
 - `POST /api/applications` requires `applications:create`
 - `GET /api/applications`:
   - `customer`: force owner filter (`owner_id = sub`)
-  - `operation|admin`: allow global list
+  - `operation`: allow global list
+  - `admin`: deny in MVP (`403 PERMISSION_DENIED`)
 - `PATCH /api/applications/{application_id}/status`:
   - `operation`: requires `applications:update_customer`
-  - `admin`: allowed only if explicitly granted `applications:update_customer`
+  - `admin`: deny in MVP (`403 PERMISSION_DENIED`)
 - `PATCH /api/applications/{application_id}` (non-status fields): out of scope for `operation` in this auth slice
 - `/api/users/operations/*` requires `users:manage_operations`
 - `/api/workflows/*` requires `workflows:manage`
@@ -411,7 +411,7 @@ Storage and transport:
 | B10 | Add test-environment auth fixture seed | `tests/auth/fixtures/**` | TODO | Seed one active user for each role (`customer`, `operation`, `admin`) to avoid login/bootstrap blockers in tests |
 | T1 | Unit tests for login and authorization services | `tests/auth/unit/**` | TODO | Success + invalid + inactive + expired |
 | T2 | Integration tests for login endpoint and `/api/*` guard | `tests/auth/integration/**` | TODO | Verify real dependency wiring |
-| T3 | RBAC tests for customer/operation/admin scopes | `tests/auth/integration/rbac/**` | TODO | Include ownership vs global list behaviors and operation customer-status-transition authorization |
+| T3 | RBAC tests for customer/operation/admin scopes | `tests/auth/integration/rbac/**` | TODO | Include ownership vs global list behaviors, operation customer-status-transition authorization, and admin deny on `/api/applications` |
 | T4 | Sensitive-data exposure tests | `tests/auth/integration/security/**` | TODO | Validate redaction and schema allowlists |
 | T5 | Rate-limit behavior tests (public + login) | `tests/auth/integration/rate_limit/**` | TODO | 429 contract, retry headers, redis-outage behavior |
 | O1 | Observability fields for auth flows | backend logging config | TODO | Include request id, user id, auth outcome |
@@ -424,7 +424,7 @@ Storage and transport:
 - Integration:
   - `POST /auth/login` with seeded Postgres user.
   - Private endpoint under `/api/*` with valid and invalid bearer tokens.
-  - RBAC matrix checks for `customer`, `operation`, and `admin`, including `operation` customer-status-transition authorization.
+  - RBAC matrix checks for `customer`, `operation`, and `admin`, including `operation` customer-status-transition authorization and admin deny on `/api/applications`.
   - Ownership checks validate both list and read behavior for `customer` when `applications.user_id` linkage is available.
   - Public endpoint throttling behavior with configured limits.
   - Stricter throttling on `/auth/login` for IP and email+IP keys.
@@ -469,7 +469,7 @@ Storage and transport:
 - **Trade-off**: Requires disciplined route registration but minimizes endpoint-level omissions.
 
 ### Decision 4: Permission-driven RBAC with fixed MVP role catalog
-- **Context**: The system must support `customer`, `operation`, and `admin` behaviors with clear boundaries.
+- **Context**: The system must support `customer`, `operation`, and `admin` behaviors with clear boundaries, with admin focused on user/workflow management.
 - **Chosen Solution**: Persist role and permission catalogs and enforce permissions at endpoint/service boundaries.
 - **Trade-off**: Slightly more schema complexity than role arrays, but safer and extensible authorization semantics with strict role separation (no inheritance).
 
@@ -493,6 +493,7 @@ Storage and transport:
 - Role permissions are explicit with no implicit inheritance between roles.
 - Customer list/read endpoints enforce ownership filters when `applications.user_id` linkage exists.
 - Operation endpoints allow global list and customer status transitions only when `applications:update_customer` is present.
+- Admin access to `/api/applications` endpoints is denied in MVP.
 - API responses and logs pass sensitive-data non-exposure checks.
 - Public services are throttled and return `429` with retry metadata when limits are exceeded.
 - `/auth/login` is protected by stricter dual-key throttling.
