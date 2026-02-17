@@ -3,7 +3,7 @@
 ## Metadata
 - Product: `credit-applications-hub`
 - Status: Draft
-- Last Updated: 2026-02-14
+- Last Updated: 2026-02-17
 - Author: Engineering
 
 ## Overview
@@ -371,13 +371,13 @@ Permission catalog:
 Role mapping:
 - `customer`: `applications:create`, `applications:list_own`
 - `operation`: `applications:list_all`, `applications:update_customer`
-- `admin`: `applications:list_all`, `users:manage_operations`, `workflows:manage`
+- `admin`: `users:manage_operations`, `workflows:manage`
 
 Guard semantics:
 - No implicit role inheritance; access is permission-driven.
 - `customer` list/read operations are always owner-scoped.
 - `operation` may list all applications and update customer applications through `applications:update_customer`.
-- `admin` operations outside user/workflow management require explicit permission grants.
+- `admin` scope in MVP is user/workflow management and excludes `/api/applications` operations.
 
 ## End-to-End Flow (MVP)
 1. Frontend submits application to backend.
