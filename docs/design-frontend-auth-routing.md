@@ -3,8 +3,9 @@
 ## Metadata
 - **Related PRD**: `docs/prd-credit-applications-hub.md` (Phase 4: Hardening)
 - **Related Backend Design**: `docs/design-auth-context.md`
+- **Related Frontend Admin Workflow Design**: `docs/design-frontend-admin-workflow-services.md`
 - **Status**: draft
-- **Last Updated**: 2026-02-16
+- **Last Updated**: 2026-02-17
 - **Author**: Engineering
 - **Scope**: Frontend login page, auth session handling, protected-route guards, and role-based dashboard redirects
 
@@ -28,6 +29,7 @@ The frontend must:
   - Signup, forgot-password, MFA, SSO.
   - Role switching UI for multi-role users.
   - Non-status application edits by `operation` role.
+  - Admin workflow management screens and services (covered by `docs/design-frontend-admin-workflow-services.md`).
   - Backend ownership-linkage implementation details (for example `applications.user_id` schema rollout).
 
 ## Functional Specifications
@@ -322,5 +324,6 @@ Redirect algorithm:
 - `docs/prd-credit-applications-hub.md`
 - `docs/architecture-specification.md`
 - `docs/design-auth-context.md`
+- `docs/design-frontend-admin-workflow-services.md`
 - `docs/bounded-context-structure.md`
 - `AGENTS.md`
