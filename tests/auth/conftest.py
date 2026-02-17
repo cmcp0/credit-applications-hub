@@ -11,7 +11,14 @@ from apps.backend.database import create_engine_for_url
 from apps.backend.main import create_app
 from apps.backend.rate_limit.redis_storage import InMemorySlidingWindowStorage
 from apps.backend.settings import Settings
+from src.applications.application.infrastructure.adapters import (  # noqa: F401
+    application_orm_model,
+    application_status_history_orm_model,
+)
+from src.applications.shared.infrastructure.adapters import outbox_event_orm_model  # noqa: F401
+from src.applications.workflow.infrastructure.adapters import workflow_orm_model  # noqa: F401
 from src.auth.shared.infrastructure.sqlalchemy_base import AuthBase
+from tests.applications.fixtures.seed import seed_workflow_data
 from tests.auth.fixtures.seed import PASSWORD, TEST_USERS, seed_auth_data
 from tests.auth.fixtures.test_password_hasher import TestPasswordHasher
 
@@ -34,6 +41,10 @@ def settings(tmp_path: Path) -> Settings:
         rate_limit_login_email_ip_window_seconds=300,
         rate_limit_login_email_ip_max_requests=5,
         rate_limit_key_pepper="test-pepper",
+        messaging_enabled=False,
+        messaging_url="amqp://unused",
+        messaging_exchange_type="topic",
+        applications_trusted_command_producers=("backend.applications.update_status.q",),
     )
 
 
@@ -51,6 +62,7 @@ def session_factory(settings: Settings) -> sessionmaker[Session]:
     test_password_hasher = TestPasswordHasher()
     with factory() as session:
         seed_auth_data(session, password_hasher=test_password_hasher)
+        seed_workflow_data(session)
 
     yield factory
 

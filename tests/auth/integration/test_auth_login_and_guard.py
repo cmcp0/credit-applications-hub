@@ -107,4 +107,5 @@ def test_private_routes_accept_valid_token(client: TestClient, seeded_users: dic
     response = client.get("/api/applications", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    body = response.json()
+    assert set(body.keys()) == {"items", "page", "page_size", "total"}
