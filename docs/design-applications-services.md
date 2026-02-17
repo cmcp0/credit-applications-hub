@@ -491,14 +491,14 @@ Storage and transport:
   - Event payload assertions verify PII minimization.
 
 ## Implementation Gaps and Mitigations
-| Gap/Risk | Impact | Mitigation |
+**Status (2026-02-17): all tracked implementation gaps in this section are closed.**
+
+| Gap/Risk | Status | Mitigation |
 |---|---|---|
-| `src/applications/` not implemented yet | Delivery risk and ad-hoc endpoint logic | Scaffold modules first and enforce boundaries in code review |
-| Current API router uses in-memory store | No transactional guarantees or outbox support | Move to repository + DB transaction + outbox pattern before enabling async consumers |
-| Missing workflow transition metadata in persistence | Invalid/unsafe status changes | Add workflow/status transition repositories and guard service |
-| Command replay in at-least-once messaging | Duplicate transitions/events | Enforce idempotency key storage by command/message id |
-| PII leakage via logs/events/responses | Security/compliance incident | Enforce schema allowlists, redaction filters, and security tests in CI |
-| Concurrency races on status updates | Lost updates and inconsistent statuses | Use optimistic locking/version fields and retry-safe handlers |
+| Async command caller trust/authorization parity with API path | CLOSED | Trusted producer check + server-side actor authorization/role resolution before applying status updates |
+| Queue retry policy for transient failures | CLOSED | Added bounded retry flow (`x-retry-count`) with retry queue + TTL + DLQ fallback |
+| Log redaction coverage for handlers added after app boot | CLOSED | Added logger handler hook in redaction installer so newly attached handlers receive PII redaction filter |
+| Missing messaging-topology contract tests and async actor auth tests | CLOSED | Added tests for RabbitMQ bindings/retry policy and async unauthorized actor rejection |
 
 ## Design Decisions
 
