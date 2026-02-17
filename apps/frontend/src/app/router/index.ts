@@ -7,6 +7,8 @@ import LoginPage from "@/features/auth/views/login_page.vue";
 import CustomerDashboardPage from "@/features/dashboards/customer_dashboard_page.vue";
 import OperationDashboardPage from "@/features/dashboards/operation_dashboard_page.vue";
 import AdminDashboardPage from "@/features/dashboards/admin_dashboard_page.vue";
+import CustomerApplicationsPage from "@/features/applications/views/customer_applications_page.vue";
+import OperationApplicationsPage from "@/features/applications/views/operation_applications_page.vue";
 import ForbiddenPage from "@/shared/ui/forbidden_page.vue";
 
 export function createAppRouter(authStore: AuthStore) {
@@ -42,6 +44,29 @@ export function createAppRouter(authStore: AuthStore) {
         path: "/dashboard/admin",
         component: AdminDashboardPage,
         meta: { requiresAuth: true },
+      },
+      {
+        path: "/applications",
+        component: RootEntryPage,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "/applications/customer",
+        component: CustomerApplicationsPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["customer"],
+          requiredPermissions: ["applications:list_own"],
+        },
+      },
+      {
+        path: "/applications/operation",
+        component: OperationApplicationsPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["operation"],
+          requiredPermissions: ["applications:list_all"],
+        },
       },
       {
         path: "/:pathMatch(.*)*",
