@@ -18,6 +18,12 @@ def _int_env(name: str, default: int) -> int:
     return int(value)
 
 
+def _csv_env(name: str, default: str) -> tuple[str, ...]:
+    value = os.getenv(name, default)
+    parts = [part.strip() for part in value.split(",")]
+    return tuple(part for part in parts if part)
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
@@ -34,6 +40,10 @@ class Settings:
     rate_limit_login_email_ip_window_seconds: int
     rate_limit_login_email_ip_max_requests: int
     rate_limit_key_pepper: str
+    messaging_enabled: bool
+    messaging_url: str
+    messaging_exchange_type: str
+    applications_trusted_command_producers: tuple[str, ...]
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -61,6 +71,13 @@ class Settings:
                 5,
             ),
             rate_limit_key_pepper=os.getenv("RATE_LIMIT_KEY_PEPPER", ""),
+            messaging_enabled=_bool_env("MESSAGING_ENABLED", False),
+            messaging_url=os.getenv("MESSAGING_URL", "amqp://guest:guest@localhost:5672/"),
+            messaging_exchange_type=os.getenv("MESSAGING_EXCHANGE_TYPE", "topic"),
+            applications_trusted_command_producers=_csv_env(
+                "APPLICATIONS_TRUSTED_COMMAND_PRODUCERS",
+                "backend.applications.update_status.q",
+            ),
         )
 
     def validate_required(self) -> None:
@@ -71,6 +88,8 @@ class Settings:
         }
         if self.rate_limit_enabled:
             required["RATE_LIMIT_KEY_PEPPER"] = self.rate_limit_key_pepper
+        if self.messaging_enabled:
+            required["MESSAGING_URL"] = self.messaging_url
         missing = [name for name, value in required.items() if not value]
         if missing:
             joined = ", ".join(sorted(missing))

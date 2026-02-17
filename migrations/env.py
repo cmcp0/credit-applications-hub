@@ -9,6 +9,12 @@ from sqlalchemy import engine_from_config, pool
 from src.auth.shared.infrastructure.sqlalchemy_base import AuthBase
 
 # Ensure model metadata is imported for autogeneration support.
+from src.applications.application.infrastructure.adapters import (  # noqa: F401
+    application_orm_model,
+    application_status_history_orm_model,
+)
+from src.applications.shared.infrastructure.adapters import outbox_event_orm_model  # noqa: F401
+from src.applications.workflow.infrastructure.adapters import workflow_orm_model  # noqa: F401
 from src.auth.authentication.infrastructure.adapters import auth_user_orm_model  # noqa: F401
 from src.auth.authorization.infrastructure.adapters import rbac_orm_models  # noqa: F401
 

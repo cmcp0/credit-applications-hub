@@ -19,6 +19,7 @@ from apps.backend.rate_limit.redis_storage import (
 )
 from apps.backend.security.pii_redaction import install_pii_redaction_filter
 from apps.backend.settings import Settings
+from src.applications.shared.domain.errors import ApplicationError, ValidationError
 from src.auth.shared.domain.errors import AuthError
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,27 @@ def create_app(
                 "code": exc.code,
                 "message": exc.message,
             },
+        )
+
+    @app.exception_handler(ApplicationError)
+    async def application_error_handler(_request, exc: ApplicationError) -> JSONResponse:
+        response_content: dict[str, object] = {
+            "code": exc.code,
+            "message": exc.message,
+        }
+        if isinstance(exc, ValidationError):
+            response_content["errors"] = [
+                {
+                    "field": error.field,
+                    "code": error.code,
+                    "message": error.message,
+                }
+                for error in exc.errors
+            ]
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=response_content,
         )
 
     @app.get("/health")

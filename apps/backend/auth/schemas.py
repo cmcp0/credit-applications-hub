@@ -31,16 +31,3 @@ class LoginResponse(BaseModel):
 class ErrorResponse(BaseModel):
     code: str
     message: str
-
-
-class ApplicationCreateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    country: str
-    requested_amount: float
-
-
-class ApplicationStatusUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    status: str

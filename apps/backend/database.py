@@ -4,6 +4,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.applications.application.infrastructure.adapters import (  # noqa: F401
+    application_orm_model,
+    application_status_history_orm_model,
+)
+from src.applications.shared.infrastructure.adapters import outbox_event_orm_model  # noqa: F401
+from src.applications.workflow.infrastructure.adapters import workflow_orm_model  # noqa: F401
 from src.auth.shared.infrastructure.sqlalchemy_base import AuthBase
 
 
@@ -23,4 +29,3 @@ def create_session_factory(database_url: str) -> sessionmaker[Session]:
 def create_auth_schema(database_url: str) -> None:
     engine = create_engine_for_url(database_url)
     AuthBase.metadata.create_all(bind=engine)
-
