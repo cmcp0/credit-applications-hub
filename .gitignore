@@ -64,6 +64,7 @@ node_modules/
 coverage/
 *.tsbuildinfo
 .vite/
+test-results/
 
 # Package manager logs
 npm-debug.log*
