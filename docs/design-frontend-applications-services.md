@@ -6,6 +6,7 @@
 - **Related Backend Design**: `docs/design-applications-services.md`
 - **Related Auth Design**: `docs/design-auth-context.md`
 - **Related Frontend Auth Design**: `docs/design-frontend-auth-routing.md`
+- **Related Frontend Admin Workflow Design**: `docs/design-frontend-admin-workflow-services.md`
 - **Status**: draft
 - **Last Updated**: 2026-02-17
 - **Author**: Engineering
@@ -30,7 +31,7 @@ The design aligns with backend contracts in `docs/design-applications-services.m
   - Support near-real-time application/status updates in frontend state.
 - **Out of scope (this slice)**:
   - Visual design of complete application pages beyond service needs.
-  - Admin workflow/user-management services (covered by separate `/api/workflows` and `/api/users/operations` slices).
+  - Admin workflow/user-management services (covered by `docs/design-frontend-admin-workflow-services.md` and backend `/api/workflows` + `/api/users/operations` slices).
   - Backend schema/transition policy implementation details.
   - Full offline-first caching strategy.
 
@@ -352,5 +353,6 @@ export interface ApplicationsPermissionPolicy {
 - `docs/design-applications-services.md`
 - `docs/design-auth-context.md`
 - `docs/design-frontend-auth-routing.md`
+- `docs/design-frontend-admin-workflow-services.md`
 - `docs/bounded-context-structure.md`
 - `AGENTS.md`
