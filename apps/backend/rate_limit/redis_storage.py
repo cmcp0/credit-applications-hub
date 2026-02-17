@@ -5,7 +5,10 @@ import time
 import uuid
 from dataclasses import dataclass
 
-from redis.asyncio import Redis
+try:  # pragma: no cover - import path when redis is installed
+    from redis.asyncio import Redis
+except ModuleNotFoundError:  # pragma: no cover - test env fallback
+    Redis = None
 
 
 class RateLimitStorageUnavailable(Exception):
@@ -23,7 +26,10 @@ class RateLimitCheckResult:
 
 class RedisSlidingWindowStorage:
     def __init__(self, redis_url: str) -> None:
-        self._redis = Redis.from_url(redis_url, decode_responses=True)
+        if Redis is None:
+            self._redis = None
+        else:
+            self._redis = Redis.from_url(redis_url, decode_responses=True)
 
     async def check_and_increment(
         self,
@@ -39,6 +45,8 @@ class RedisSlidingWindowStorage:
         member = f"{now_ms}:{uuid.uuid4()}"
 
         try:
+            if self._redis is None:
+                raise RateLimitStorageUnavailable()
             pipeline = self._redis.pipeline(transaction=True)
             pipeline.zadd(key, {member: now_ms})
             pipeline.zremrangebyscore(key, 0, window_start_ms)
