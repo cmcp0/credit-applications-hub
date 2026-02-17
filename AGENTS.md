@@ -62,7 +62,7 @@ credit-applications-hub/
 |-- apps/
 |   |-- backend/                   # Backend entrypoint scaffold
 |   |-- frontend/                  # Frontend entrypoint scaffold
-|   |-- async_tasks/               # Async worker/process scaffold
+|   |-- workers/                   # Async worker/process scaffold
 |   `-- webhooks/                  # Webhook handler scaffold
 |-- docs/
 |   |-- bounded-context-structure.md
