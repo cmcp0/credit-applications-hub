@@ -244,7 +244,7 @@ classDiagram
   Application "0..*" --> "1" AuthUser : owner
   Application "1" --> "1" Status : current
   Application "1" --> "1" Countries : country
-  Countries "1" --> "0..1" Workflow : workflow (current invariant)
+  Countries "1" --> "0..*" Workflow : versioned workflow definitions
   Workflow "1" --> "1" Countries : country
   Workflow "1" *-- "1..*" Status : defines statuses
   Status "1" --> "0..*" Status : allowed_transitions
@@ -268,7 +268,8 @@ classDiagram
 ```
 
 ### Current Invariants (MVP)
-- Only one `Workflow` is allowed per country (`Countries`) value for now; no country can have more than one workflow.
+- Multiple `Workflow` versions can exist per country (`Countries`) value.
+- Only one workflow per country may be active and published at a time.
 - Exactly one `Status` row must have `is_initial=true` per `Workflow`.
 - Multiple `Operation` rows can belong to the same `Workflow`.
 - Each `Operation` can have multiple ordered `SubOperation` rows.
@@ -322,7 +323,8 @@ Recommended patterns:
 - Transaction boundaries around state changes.
 - Outbox table for reliable event publication.
 - Optimistic locking/version fields for race-safe status updates.
-- Enforce one-workflow-per-country with a unique constraint/index on `workflow.country`.
+- Enforce versioned workflow uniqueness with a unique index on `workflow(country, version)`.
+- Enforce one active published workflow per country with a unique partial index on `workflow(country)` where `active=true` and `version_status='PUBLISHED'`.
 - Enforce one-initial-status-per-workflow with a unique partial index on `status(workflow_id)` where `is_initial=true`.
 - If using a join table for the self-relation, enforce unique transition edges with a unique index on `status_transition(from_status_id, to_status_id)`.
 - Enforce unique user identity with a case-insensitive unique index on `auth_users.email` (CITEXT).
