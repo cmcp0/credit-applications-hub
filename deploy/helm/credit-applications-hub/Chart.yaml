@@ -1,0 +1,6 @@
+apiVersion: v2
+name: credit-applications-hub
+description: Local Docker Desktop deployment for Credit Applications Hub (backend, frontend, workers, webhooks, infra)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

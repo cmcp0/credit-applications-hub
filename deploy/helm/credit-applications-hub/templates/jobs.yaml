@@ -1,0 +1,84 @@
+{{- if .Values.jobs.migrate.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "credit-applications-hub.componentName" (dict "context" . "name" "migrate") }}
+  labels:
+    {{- include "credit-applications-hub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "credit-applications-hub.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ printf "%s:%s" .Values.images.python.repository .Values.images.python.tag }}
+          imagePullPolicy: {{ .Values.images.python.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              retries={{ .Values.jobs.migrate.retries }}
+              delay={{ .Values.jobs.migrate.retryDelaySeconds }}
+              n=1
+              until [ "$n" -gt "$retries" ]
+              do
+                echo "Running alembic upgrade head (attempt ${n}/${retries})"
+                alembic upgrade head && exit 0
+                n=$((n+1))
+                sleep "$delay"
+              done
+              echo "Migration failed after ${retries} attempts"
+              exit 1
+          envFrom:
+            - configMapRef:
+                name: {{ include "credit-applications-hub.commonEnvConfigMapName" . }}
+            - secretRef:
+                name: {{ include "credit-applications-hub.commonEnvSecretName" . }}
+{{- end }}
+
+{{- if .Values.jobs.seed.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "credit-applications-hub.componentName" (dict "context" . "name" "seed") }}
+  labels:
+    {{- include "credit-applications-hub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seed
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "credit-applications-hub.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: seed
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: {{ printf "%s:%s" .Values.images.python.repository .Values.images.python.tag }}
+          imagePullPolicy: {{ .Values.images.python.pullPolicy }}
+          command: ["python", "scripts/seed_local_data.py"]
+          env:
+            - name: MOCK_CO_BANK_PROVIDER_URL
+              value: {{ default (printf "http://%s:%d/providers/co/banking-data" (include "credit-applications-hub.mockProviderHost" .) (int .Values.mockProvider.service.port)) .Values.jobs.seed.mockCoProviderUrl | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "credit-applications-hub.commonEnvConfigMapName" . }}
+            - secretRef:
+                name: {{ include "credit-applications-hub.commonEnvSecretName" . }}
+{{- end }}

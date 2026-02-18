@@ -1,0 +1,34 @@
+{{- if .Values.workers.enabled }}
+{{- range $process := .Values.workers.processes }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "credit-applications-hub.componentName" (dict "context" $ "name" (printf "worker-%s" $process.name)) }}
+  labels:
+    {{- include "credit-applications-hub.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ printf "worker-%s" $process.name }}
+spec:
+  replicas: {{ $.Values.workers.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "credit-applications-hub.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ printf "worker-%s" $process.name }}
+  template:
+    metadata:
+      labels:
+        {{- include "credit-applications-hub.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ printf "worker-%s" $process.name }}
+    spec:
+      containers:
+        - name: worker
+          image: {{ printf "%s:%s" $.Values.images.python.repository $.Values.images.python.tag }}
+          imagePullPolicy: {{ $.Values.images.python.pullPolicy }}
+          command: ["python", "-m", {{ $process.module | quote }}]
+          envFrom:
+            - configMapRef:
+                name: {{ include "credit-applications-hub.commonEnvConfigMapName" $ }}
+            - secretRef:
+                name: {{ include "credit-applications-hub.commonEnvSecretName" $ }}
+{{- end }}
+{{- end }}

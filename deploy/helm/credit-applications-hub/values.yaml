@@ -1,0 +1,122 @@
+nameOverride: ""
+fullnameOverride: ""
+
+images:
+  python:
+    repository: credit-applications-hub-python
+    tag: local
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: credit-applications-hub-frontend
+    tag: local
+    pullPolicy: IfNotPresent
+
+app:
+  auth:
+    jwtSecret: local-dev-jwt-secret
+    jwtIssuer: credit-applications-hub
+    jwtAudience: credit-applications-hub-api
+    jwtTtlSeconds: 3600
+  rateLimit:
+    enabled: true
+    keyPepper: local-dev-rate-limit-pepper
+    publicWindowSeconds: 60
+    publicMaxRequests: 120
+    loginIpWindowSeconds: 60
+    loginIpMaxRequests: 10
+    loginEmailIpWindowSeconds: 300
+    loginEmailIpMaxRequests: 5
+  messaging:
+    enabled: true
+    exchangeType: topic
+  applications:
+    trustedCommandProducers: backend.applications.update_status.q
+    readCacheEnabled: true
+    readCacheTtlSeconds: 10
+    realtimeEnabled: true
+    realtimePollIntervalMs: 1000
+
+backend:
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8000
+
+webhooks:
+  enabled: true
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8001
+
+mockProvider:
+  enabled: true
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8080
+
+frontend:
+  replicas: 1
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080
+
+workers:
+  enabled: true
+  replicaCount: 1
+  processes:
+    - name: outbox-publisher
+      module: apps.workers.outbox_publisher
+    - name: status-update-command
+      module: apps.workers.status_update_command_worker
+    - name: workflow-execute
+      module: apps.workers.workflow_execute_worker
+    - name: workflow-execution-projection
+      module: apps.workers.workflow_execution_projection_worker
+    - name: webhook-ingress-normalize
+      module: apps.workers.webhook_ingress_normalize_worker
+    - name: webhook-egress-delivery
+      module: apps.workers.webhook_egress_delivery_worker
+    - name: webhook-replay
+      module: apps.workers.webhook_replay_worker
+
+jobs:
+  migrate:
+    enabled: true
+    retries: 30
+    retryDelaySeconds: 3
+  seed:
+    enabled: true
+    mockCoProviderUrl: ""
+
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  database: credit_applications_hub
+  username: postgres
+  password: postgres
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    size: 2Gi
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  service:
+    port: 6379
+
+rabbitmq:
+  enabled: true
+  image: rabbitmq:3.13-management-alpine
+  username: guest
+  password: guest
+  service:
+    amqpPort: 5672
+    managementPort: 15672
+  persistence:
+    enabled: false
+    size: 2Gi

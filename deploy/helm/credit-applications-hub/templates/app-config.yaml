@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "credit-applications-hub.commonEnvConfigMapName" . }}
+  labels:
+    {{- include "credit-applications-hub.labels" . | nindent 4 }}
+data:
+  AUTH_JWT_ISSUER: {{ .Values.app.auth.jwtIssuer | quote }}
+  AUTH_JWT_AUDIENCE: {{ .Values.app.auth.jwtAudience | quote }}
+  AUTH_JWT_TTL_SECONDS: {{ .Values.app.auth.jwtTtlSeconds | quote }}
+
+  RATE_LIMIT_ENABLED: {{ .Values.app.rateLimit.enabled | quote }}
+  RATE_LIMIT_PUBLIC_WINDOW_SECONDS: {{ .Values.app.rateLimit.publicWindowSeconds | quote }}
+  RATE_LIMIT_PUBLIC_MAX_REQUESTS: {{ .Values.app.rateLimit.publicMaxRequests | quote }}
+  RATE_LIMIT_LOGIN_IP_WINDOW_SECONDS: {{ .Values.app.rateLimit.loginIpWindowSeconds | quote }}
+  RATE_LIMIT_LOGIN_IP_MAX_REQUESTS: {{ .Values.app.rateLimit.loginIpMaxRequests | quote }}
+  RATE_LIMIT_LOGIN_EMAIL_IP_WINDOW_SECONDS: {{ .Values.app.rateLimit.loginEmailIpWindowSeconds | quote }}
+  RATE_LIMIT_LOGIN_EMAIL_IP_MAX_REQUESTS: {{ .Values.app.rateLimit.loginEmailIpMaxRequests | quote }}
+  RATE_LIMIT_REDIS_URL: {{ printf "redis://%s:%d/0" (include "credit-applications-hub.redisHost" .) (int .Values.redis.service.port) | quote }}
+
+  MESSAGING_ENABLED: {{ .Values.app.messaging.enabled | quote }}
+  MESSAGING_EXCHANGE_TYPE: {{ .Values.app.messaging.exchangeType | quote }}
+
+  APPLICATIONS_TRUSTED_COMMAND_PRODUCERS: {{ .Values.app.applications.trustedCommandProducers | quote }}
+  APPLICATIONS_READ_CACHE_ENABLED: {{ .Values.app.applications.readCacheEnabled | quote }}
+  APPLICATIONS_READ_CACHE_REDIS_URL: {{ printf "redis://%s:%d/1" (include "credit-applications-hub.redisHost" .) (int .Values.redis.service.port) | quote }}
+  APPLICATIONS_READ_CACHE_TTL_SECONDS: {{ .Values.app.applications.readCacheTtlSeconds | quote }}
+  APPLICATIONS_REALTIME_ENABLED: {{ .Values.app.applications.realtimeEnabled | quote }}
+  APPLICATIONS_REALTIME_POLL_INTERVAL_MS: {{ .Values.app.applications.realtimePollIntervalMs | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "credit-applications-hub.commonEnvSecretName" . }}
+  labels:
+    {{- include "credit-applications-hub.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  AUTH_JWT_SECRET: {{ .Values.app.auth.jwtSecret | quote }}
+  RATE_LIMIT_KEY_PEPPER: {{ .Values.app.rateLimit.keyPepper | quote }}
+  DATABASE_URL: {{ printf "postgresql+psycopg://%s:%s@%s:%d/%s" .Values.postgres.username .Values.postgres.password (include "credit-applications-hub.databaseHost" .) (int .Values.postgres.service.port) .Values.postgres.database | quote }}
+  MESSAGING_URL: {{ printf "amqp://%s:%s@%s:%d/" .Values.rabbitmq.username .Values.rabbitmq.password (include "credit-applications-hub.rabbitmqHost" .) (int .Values.rabbitmq.service.amqpPort) | quote }}
