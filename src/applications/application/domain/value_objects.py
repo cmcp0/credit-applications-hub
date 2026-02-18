@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-SUPPORTED_COUNTRIES = ("BR", "CL", "CO", "MX", "PE")
+SUPPORTED_COUNTRIES = ("BR", "CL", "CO", "ES", "MX", "PE")
 
 
 @dataclass(frozen=True)

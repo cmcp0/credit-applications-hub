@@ -20,10 +20,14 @@ from src.applications.workflow.application.services.resolve_initial_status_servi
 IDENTITY_DOCUMENT_PATTERNS: dict[str, re.Pattern[str]] = {
     "MX": re.compile(r"^[A-Z0-9]{6,18}$"),
     "BR": re.compile(r"^[0-9]{11}$"),
-    "CO": re.compile(r"^[A-Z0-9]{6,14}$"),
+    "CO": re.compile(r"^[0-9]{6,12}$"),
+    "ES": re.compile(r"^[0-9]{8}[A-Z]$"),
     "CL": re.compile(r"^[A-Z0-9\-]{6,14}$"),
     "PE": re.compile(r"^[0-9]{8,12}$"),
 }
+
+ES_ADDITIONAL_REVIEW_AMOUNT_THRESHOLD = 12_000
+ES_DNI_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE"
 
 
 @dataclass(frozen=True)
@@ -61,7 +65,7 @@ class CreateApplicationService:
             requested_amount=float(command.requested_amount),
             monthly_income=float(command.monthly_income),
             application_date=date.today(),
-            initial_status_code=self._resolve_initial_status_service.resolve(normalized_country),
+            initial_status_code=self._resolve_initial_status_code(command, normalized_country),
             created_at=created_at,
         )
 
@@ -134,6 +138,14 @@ class CreateApplicationService:
                     message="Identity document format is invalid for selected country",
                 )
             )
+        elif normalized_country == "ES" and not _is_valid_es_dni(normalized_document):
+            errors.append(
+                FieldValidationError(
+                    field="identity_document",
+                    code="INVALID_VERIFICATION",
+                    message="DNI verification failed",
+                )
+            )
 
         if command.requested_amount <= 0:
             errors.append(
@@ -154,3 +166,22 @@ class CreateApplicationService:
             )
 
         return errors
+
+    def _resolve_initial_status_code(
+        self,
+        command: CreateApplicationCommand,
+        normalized_country: str,
+    ) -> str:
+        if (
+            normalized_country == "ES"
+            and float(command.requested_amount) > ES_ADDITIONAL_REVIEW_AMOUNT_THRESHOLD
+        ):
+            return "ADDITIONAL_REVIEW"
+
+        return self._resolve_initial_status_service.resolve(normalized_country)
+
+
+def _is_valid_es_dni(normalized_document: str) -> bool:
+    number = int(normalized_document[:8])
+    expected_letter = ES_DNI_LETTERS[number % len(ES_DNI_LETTERS)]
+    return normalized_document[-1] == expected_letter

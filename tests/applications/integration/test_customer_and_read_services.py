@@ -108,3 +108,46 @@ def test_customer_cannot_read_other_customer_application(
 
     assert detail_response.status_code == 404
     assert detail_response.json()["code"] == "APPLICATION_NOT_FOUND"
+
+
+def test_es_dni_verification_and_additional_review_threshold(
+    client: TestClient,
+    seeded_users: dict[str, dict[str, str]],
+) -> None:
+    customer_token = _token_for(
+        client,
+        seeded_users["customer"]["email"],
+        seeded_users["customer"]["password"],
+    )
+
+    invalid_dni_response = client.post(
+        "/api/applications",
+        json={
+            "country": "ES",
+            "full_name": "Jane Doe",
+            "identity_document": "12345678A",
+            "requested_amount": 11000,
+            "monthly_income": 3500,
+        },
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+    assert invalid_dni_response.status_code == 400
+    assert invalid_dni_response.json()["code"] == "VALIDATION_ERROR"
+    assert any(
+        error["code"] == "INVALID_VERIFICATION"
+        for error in invalid_dni_response.json().get("errors", [])
+    )
+
+    valid_high_amount_response = client.post(
+        "/api/applications",
+        json={
+            "country": "ES",
+            "full_name": "Jane Doe",
+            "identity_document": "12345678Z",
+            "requested_amount": 13000,
+            "monthly_income": 3500,
+        },
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+    assert valid_high_amount_response.status_code == 201
+    assert valid_high_amount_response.json()["status_code"] == "ADDITIONAL_REVIEW"
