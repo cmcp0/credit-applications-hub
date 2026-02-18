@@ -138,6 +138,7 @@ def seed_workflows(session: Session) -> None:
             workflow.published_by = FIXTURE_ADMIN_USER_ID
             workflow.published_at = now
             workflow.updated_at = now
+        session.flush()
 
         status_by_code: dict[str, uuid.UUID] = {}
         for status_fixture in fixture["statuses"]:
@@ -161,6 +162,7 @@ def seed_workflows(session: Session) -> None:
                 status.is_initial = bool(status_fixture["is_initial"])
                 status.sort_order = int(status_fixture["sort_order"])
             status_by_code[status_fixture["code"]] = status_fixture["id"]
+        session.flush()
 
         for from_code, to_code in fixture["transitions"]:
             from_status_id = status_by_code[from_code]
@@ -235,6 +237,7 @@ def seed_workflows(session: Session) -> None:
                 operation.sort_order = int(operation_fixture["sort_order"])
                 operation.active = bool(operation_fixture["active"])
                 operation.updated_at = now
+            session.flush()
 
             for sub_operation_fixture in operation_fixture.get("sub_operations", ()):
                 sub_operation = session.get(WorkflowSubOperationOrm, sub_operation_fixture["id"])
@@ -261,6 +264,7 @@ def seed_workflows(session: Session) -> None:
                     sub_operation.output_alias = sub_operation_fixture.get("output_alias")
                     sub_operation.active = bool(sub_operation_fixture["active"])
                     sub_operation.updated_at = now
+                session.flush()
 
                 for trigger_fixture in sub_operation_fixture.get("triggers", ()):
                     trigger = session.get(WorkflowSubOperationTriggerOrm, trigger_fixture["id"])
