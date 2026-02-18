@@ -21,7 +21,6 @@ ROLE_PERMISSION_MAP: Mapping[str, tuple[str, ...]] = {
         "applications:update_customer",
     ),
     "admin": (
-        "applications:list_all",
         "users:manage_operations",
         "workflows:manage",
     ),
@@ -33,4 +32,3 @@ def permissions_for_roles(roles: tuple[str, ...]) -> tuple[str, ...]:
     for role in roles:
         resolved.update(ROLE_PERMISSION_MAP.get(role, ()))
     return tuple(sorted(resolved))
-

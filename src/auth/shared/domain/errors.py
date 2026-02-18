@@ -53,3 +53,15 @@ class RateLimiterUnavailableError(AuthError):
     status_code = 503
     code = "RATE_LIMITER_UNAVAILABLE"
     message = "Rate limiter is unavailable"
+
+
+class UserNotFoundError(AuthError):
+    status_code = 404
+    code = "USER_NOT_FOUND"
+    message = "User not found"
+
+
+class RoleAlreadyAssignedError(AuthError):
+    status_code = 409
+    code = "ROLE_ALREADY_ASSIGNED"
+    message = "Role already assigned"

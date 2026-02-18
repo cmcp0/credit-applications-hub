@@ -138,6 +138,10 @@ def test_admin_permissions_are_explicit_not_inherited(
         "/api/workflows",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
+    applications_list_response = client.get(
+        "/api/applications",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
     status_response = client.patch(
         "/api/applications/00000000-0000-0000-0000-000000000000/status",
         json={"status": "APPROVED", "expected_version": 1},
@@ -146,5 +150,7 @@ def test_admin_permissions_are_explicit_not_inherited(
 
     assert users_response.status_code == 200
     assert workflows_response.status_code == 200
+    assert applications_list_response.status_code == 403
+    assert applications_list_response.json()["code"] == "PERMISSION_DENIED"
     assert status_response.status_code == 403
     assert status_response.json()["code"] == "PERMISSION_DENIED"
