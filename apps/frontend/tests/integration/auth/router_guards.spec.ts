@@ -69,4 +69,40 @@ describe("router guards", () => {
 
     expect(router.currentRoute.value.path).toBe("/forbidden");
   });
+
+  it("allows admin workflow route with workflows:manage permission", async () => {
+    const pinia = createPinia();
+    const authStore = useAuthStore(pinia);
+    authStore.applyLoginResponse(
+      makeLoginResponse({
+        access_token: makeJwt({
+          roles: ["admin"],
+          permissions: ["workflows:manage"],
+        }),
+      }),
+    );
+
+    const router = createAppRouter(authStore);
+    await router.push("/dashboard/admin/workflows");
+
+    expect(router.currentRoute.value.path).toBe("/dashboard/admin/workflows");
+  });
+
+  it("blocks admin workflow route without required permission", async () => {
+    const pinia = createPinia();
+    const authStore = useAuthStore(pinia);
+    authStore.applyLoginResponse(
+      makeLoginResponse({
+        access_token: makeJwt({
+          roles: ["admin"],
+          permissions: ["users:manage_operations"],
+        }),
+      }),
+    );
+
+    const router = createAppRouter(authStore);
+    await router.push("/dashboard/admin/workflows");
+
+    expect(router.currentRoute.value.path).toBe("/forbidden");
+  });
 });

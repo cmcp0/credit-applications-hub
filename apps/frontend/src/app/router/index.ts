@@ -9,6 +9,11 @@ import OperationDashboardPage from "@/features/dashboards/operation_dashboard_pa
 import AdminDashboardPage from "@/features/dashboards/admin_dashboard_page.vue";
 import CustomerApplicationsPage from "@/features/applications/views/customer_applications_page.vue";
 import OperationApplicationsPage from "@/features/applications/views/operation_applications_page.vue";
+import AdminOperationUsersPage from "@/features/admin_workflows/views/admin_operation_users_page.vue";
+import AdminWorkflowsPage from "@/features/admin_workflows/views/admin_workflows_page.vue";
+import AdminWorkflowEditorPage from "@/features/admin_workflows/views/admin_workflow_editor_page.vue";
+import AdminWorkflowWebhooksPage from "@/features/admin_workflows/views/admin_workflow_webhooks_page.vue";
+import AdminWorkflowExecutionsPage from "@/features/admin_workflows/views/admin_workflow_executions_page.vue";
 import ForbiddenPage from "@/shared/ui/forbidden_page.vue";
 
 export function createAppRouter(authStore: AuthStore) {
@@ -44,6 +49,51 @@ export function createAppRouter(authStore: AuthStore) {
         path: "/dashboard/admin",
         component: AdminDashboardPage,
         meta: { requiresAuth: true },
+      },
+      {
+        path: "/dashboard/admin/operation-users",
+        component: AdminOperationUsersPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["admin"],
+          requiredPermissions: ["users:manage_operations"],
+        },
+      },
+      {
+        path: "/dashboard/admin/workflows",
+        component: AdminWorkflowsPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["admin"],
+          requiredPermissions: ["workflows:manage"],
+        },
+      },
+      {
+        path: "/dashboard/admin/workflows/:workflowId/editor",
+        component: AdminWorkflowEditorPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["admin"],
+          requiredPermissions: ["workflows:manage"],
+        },
+      },
+      {
+        path: "/dashboard/admin/workflows/:workflowId/webhooks",
+        component: AdminWorkflowWebhooksPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["admin"],
+          requiredPermissions: ["workflows:manage"],
+        },
+      },
+      {
+        path: "/dashboard/admin/workflows/:workflowId/executions",
+        component: AdminWorkflowExecutionsPage,
+        meta: {
+          requiresAuth: true,
+          allowedRoles: ["admin"],
+          requiredPermissions: ["workflows:manage"],
+        },
       },
       {
         path: "/applications",
