@@ -26,6 +26,14 @@ def _publish_outbox_events(session_factory) -> None:
     outbox_publisher.publish_cycle(limit=100)
 
 
+def _admin_token(client: TestClient, seeded_users: dict[str, dict[str, str]]) -> str:
+    return _token_for(
+        client,
+        seeded_users["admin"]["email"],
+        seeded_users["admin"]["password"],
+    )
+
+
 def test_application_created_event_contract_is_versioned_and_pii_safe(
     client: TestClient,
     seeded_users: dict[str, dict[str, str]],
@@ -154,4 +162,68 @@ def test_application_status_updated_event_contract_is_versioned_and_pii_safe(
     assert "full_name" not in payload["payload"]
     assert outbox_event.exchange_name == "applications.events"
     assert outbox_event.routing_key == "credit.application.status.updated"
+    assert outbox_event.publish_status == "PUBLISHED"
+
+
+def test_workflow_definition_published_event_contract_is_versioned(
+    client: TestClient,
+    seeded_users: dict[str, dict[str, str]],
+    session_factory,
+) -> None:
+    admin_token = _admin_token(client, seeded_users)
+    create_response = client.post(
+        "/api/workflows",
+        json={
+            "country": "AR",
+            "version": 1,
+            "statuses": [
+                {
+                    "code": "PENDING_REVIEW",
+                    "label": "Pending review",
+                    "is_initial": True,
+                    "is_terminal": False,
+                    "sort_order": 1,
+                },
+                {
+                    "code": "APPROVED",
+                    "label": "Approved",
+                    "is_initial": False,
+                    "is_terminal": True,
+                    "sort_order": 2,
+                },
+            ],
+            "transitions": [{"from": "PENDING_REVIEW", "to": "APPROVED"}],
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_response.status_code == 201
+    workflow_id = create_response.json()["id"]
+
+    publish_response = client.post(
+        f"/api/workflows/{workflow_id}/publish",
+        json={"expected_version": 1},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert publish_response.status_code == 200
+
+    _publish_outbox_events(session_factory)
+
+    with session_factory() as session:
+        outbox_event = session.execute(
+            select(OutboxEventOrm).where(
+                OutboxEventOrm.aggregate_id == uuid.UUID(workflow_id),
+                OutboxEventOrm.event_name == "WorkflowDefinitionPublished",
+            )
+        ).scalar_one()
+
+    payload = outbox_event.payload
+    assert payload["event_name"] == "WorkflowDefinitionPublished"
+    assert payload["schema_version"] == "v1"
+    assert payload["payload"]["workflow_id"] == workflow_id
+    assert payload["payload"]["country"] == "AR"
+    assert payload["payload"]["version"] == 1
+    assert payload["payload"]["version_status"] == "PUBLISHED"
+    assert payload["payload"]["graph_revision"] == 0
+    assert outbox_event.exchange_name == "workflows.events"
+    assert outbox_event.routing_key == "credit.workflow.definition.published"
     assert outbox_event.publish_status == "PUBLISHED"

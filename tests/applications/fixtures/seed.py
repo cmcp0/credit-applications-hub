@@ -17,6 +17,7 @@ WORKFLOW_IDS = {
     "CO": uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0003"),
     "CL": uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0004"),
     "PE": uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0005"),
+    "ES": uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0006"),
 }
 
 STATUS_IDS = {
@@ -45,7 +46,15 @@ STATUS_IDS = {
         "APPROVED": uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccc5002"),
         "REJECTED": uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccc5003"),
     },
+    "ES": {
+        "PENDING_REVIEW": uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccc6001"),
+        "ADDITIONAL_REVIEW": uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccc6002"),
+        "APPROVED": uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccc6003"),
+        "REJECTED": uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccc6004"),
+    },
 }
+
+TEST_ADMIN_USER_ID = uuid.UUID("44444444-4444-4444-4444-444444444443")
 
 
 def seed_workflow_data(session: Session) -> None:
@@ -58,6 +67,10 @@ def seed_workflow_data(session: Session) -> None:
                 id=workflow_id,
                 country=country,
                 active=True,
+                version=1,
+                version_status="PUBLISHED",
+                published_by=TEST_ADMIN_USER_ID,
+                published_at=now,
                 created_at=now,
                 updated_at=now,
             )
@@ -68,6 +81,12 @@ def seed_workflow_data(session: Session) -> None:
             if existing_status is not None:
                 continue
 
+            sort_order = {
+                "PENDING_REVIEW": 1,
+                "ADDITIONAL_REVIEW": 2,
+                "APPROVED": 3,
+                "REJECTED": 4,
+            }[status_code]
             session.add(
                 StatusOrm(
                     id=status_id,
@@ -76,17 +95,27 @@ def seed_workflow_data(session: Session) -> None:
                     label=status_code.replace("_", " ").title(),
                     is_terminal=status_code in {"APPROVED", "REJECTED"},
                     is_initial=status_code == "PENDING_REVIEW",
-                    sort_order={"PENDING_REVIEW": 1, "APPROVED": 2, "REJECTED": 3}[status_code],
+                    sort_order=sort_order,
                 )
             )
 
-        pending_id = STATUS_IDS[country]["PENDING_REVIEW"]
-        for to_status in ("APPROVED", "REJECTED"):
+        transitions = [("PENDING_REVIEW", "APPROVED"), ("PENDING_REVIEW", "REJECTED")]
+        if country == "ES":
+            transitions.extend(
+                [
+                    ("PENDING_REVIEW", "ADDITIONAL_REVIEW"),
+                    ("ADDITIONAL_REVIEW", "APPROVED"),
+                    ("ADDITIONAL_REVIEW", "REJECTED"),
+                ]
+            )
+
+        for from_status, to_status in transitions:
+            from_status_id = STATUS_IDS[country][from_status]
             to_status_id = STATUS_IDS[country][to_status]
             transition_exists = (
                 session.query(StatusTransitionOrm)
                 .filter(
-                    StatusTransitionOrm.from_status_id == pending_id,
+                    StatusTransitionOrm.from_status_id == from_status_id,
                     StatusTransitionOrm.to_status_id == to_status_id,
                 )
                 .first()
@@ -95,7 +124,7 @@ def seed_workflow_data(session: Session) -> None:
                 session.add(
                     StatusTransitionOrm(
                         id=uuid.uuid4(),
-                        from_status_id=pending_id,
+                        from_status_id=from_status_id,
                         to_status_id=to_status_id,
                     )
                 )

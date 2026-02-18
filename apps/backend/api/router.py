@@ -1,25 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from apps.backend.api.applications.router import router as applications_router
-from apps.backend.auth.dependencies import require_permissions
+from apps.backend.api.users_operations.router import router as users_operations_router
+from apps.backend.api.workflows.router import router as workflows_router
 
 router = APIRouter(tags=["api"])
 router.include_router(applications_router)
-
-
-@router.get(
-    "/users/operations",
-    dependencies=[Depends(require_permissions("users:manage_operations"))],
-)
-def list_operation_users() -> dict[str, object]:
-    return {"items": []}
-
-
-@router.get(
-    "/workflows",
-    dependencies=[Depends(require_permissions("workflows:manage"))],
-)
-def list_workflows() -> dict[str, object]:
-    return {"items": []}
+router.include_router(users_operations_router)
+router.include_router(workflows_router)
