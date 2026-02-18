@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Optional
 
 from fastapi import Depends, FastAPI
@@ -17,6 +18,11 @@ from apps.backend.rate_limit.redis_storage import (
     InMemorySlidingWindowStorage,
     RedisSlidingWindowStorage,
 )
+from apps.backend.realtime.applications_stream import (
+    ApplicationsRealtimeHub,
+    ApplicationsRealtimeProjector,
+)
+from apps.backend.realtime.router import router as realtime_router
 from apps.backend.security.pii_redaction import install_pii_redaction_filter
 from apps.backend.settings import Settings
 from src.applications.shared.domain.errors import ApplicationError, ValidationError
@@ -34,7 +40,36 @@ def create_app(
     runtime_settings = settings or Settings.from_env()
     runtime_settings.validate_required()
 
-    app = FastAPI(title="Credit Applications Hub API")
+    @asynccontextmanager
+    async def app_lifespan(app: FastAPI):
+        if runtime_settings.applications_realtime_enabled:
+            projector = ApplicationsRealtimeProjector(
+                session_factory=app.state.session_factory,
+                hub=app.state.applications_realtime_hub,
+                poll_interval_ms=runtime_settings.applications_realtime_poll_interval_ms,
+            )
+            projector_task = asyncio.create_task(
+                projector.run(),
+                name="applications-realtime-projector",
+            )
+            app.state.applications_realtime_projector = projector
+            app.state.applications_realtime_projector_task = projector_task
+
+        try:
+            yield
+        finally:
+            projector = app.state.applications_realtime_projector
+            projector_task = app.state.applications_realtime_projector_task
+            if projector is not None:
+                projector.stop()
+            if projector_task is not None:
+                projector_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await projector_task
+            app.state.applications_realtime_projector = None
+            app.state.applications_realtime_projector_task = None
+
+    app = FastAPI(title="Credit Applications Hub API", lifespan=app_lifespan)
     app.state.settings = runtime_settings
     app.state.session_factory = session_factory or create_session_factory(runtime_settings.database_url)
     if rate_limit_storage is not None:
@@ -43,6 +78,9 @@ def create_app(
         app.state.rate_limit_storage = RedisSlidingWindowStorage(runtime_settings.rate_limit_redis_url)
     else:
         app.state.rate_limit_storage = InMemorySlidingWindowStorage()
+    app.state.applications_realtime_hub = ApplicationsRealtimeHub()
+    app.state.applications_realtime_projector = None
+    app.state.applications_realtime_projector_task = None
 
     app.add_middleware(
         RateLimitMiddleware,
@@ -99,6 +137,7 @@ def create_app(
         return {"status": "ok"}
 
     app.include_router(auth_router)
+    app.include_router(realtime_router, prefix="/api")
     app.include_router(
         api_router,
         prefix="/api",

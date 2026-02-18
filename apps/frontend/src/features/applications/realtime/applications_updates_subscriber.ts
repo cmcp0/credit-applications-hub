@@ -1,4 +1,5 @@
 import type { ApplicationSummary } from "@/features/applications/model/application_types";
+import { loadAuthSession } from "@/features/auth/services/token_storage";
 
 export interface ApplicationsRealtimeEvent {
   application: ApplicationSummary;
@@ -56,6 +57,14 @@ export function subscribeToApplicationsUpdates(
       },
     };
   }
+  if (typeof WebSocket === "undefined") {
+    onConnectionStateChange("degraded");
+    return {
+      unsubscribe(): void {
+        window.removeEventListener(CUSTOM_EVENT_NAME, customEventHandler as EventListener);
+      },
+    };
+  }
 
   const socket = new WebSocket(wsUrl);
   socket.onopen = () => {
@@ -90,12 +99,73 @@ export function subscribeToApplicationsUpdates(
 }
 
 function resolveWebSocketUrl(): string | null {
-  const configured = (import.meta.env.VITE_APPLICATIONS_WS_URL ?? "").trim();
-  if (configured.length > 0) {
-    return configured;
+  const token = resolveAccessToken();
+  if (!token) {
+    return null;
   }
 
+  const configured = (import.meta.env.VITE_APPLICATIONS_WS_URL ?? "").trim();
+  if (configured.length > 0) {
+    return withAccessToken(configured, token);
+  }
+
+  const base = (import.meta.env.VITE_API_BASE_URL ?? "").trim() || window.location.origin;
+  let parsed: URL;
+  try {
+    parsed = new URL(base, window.location.origin);
+  } catch {
+    return null;
+  }
+
+  const protocol = toWebSocketProtocol(parsed.protocol);
+  if (!protocol) {
+    return null;
+  }
+
+  parsed.protocol = protocol;
+  parsed.pathname = "/api/realtime/applications/ws";
+  parsed.search = "";
+  parsed.hash = "";
+  parsed.searchParams.set("access_token", token);
+  return parsed.toString();
+}
+
+function withAccessToken(url: string, token: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url, window.location.origin);
+  } catch {
+    return null;
+  }
+
+  const protocol = toWebSocketProtocol(parsed.protocol);
+  if (!protocol) {
+    return null;
+  }
+  parsed.protocol = protocol;
+  parsed.searchParams.set("access_token", token);
+  return parsed.toString();
+}
+
+function toWebSocketProtocol(protocol: string): string | null {
+  if (protocol === "http:") {
+    return "ws:";
+  }
+  if (protocol === "https:") {
+    return "wss:";
+  }
+  if (protocol === "ws:" || protocol === "wss:") {
+    return protocol;
+  }
   return null;
+}
+
+function resolveAccessToken(): string | null {
+  const session = loadAuthSession();
+  if (!session) {
+    return null;
+  }
+  return session.token;
 }
 
 function extractRealtimeEvent(value: unknown): ApplicationsRealtimeEvent | null {

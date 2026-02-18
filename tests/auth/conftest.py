@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from src.applications.application.infrastructure.adapters import (  # noqa: F401
     application_status_history_orm_model,
 )
 from src.applications.shared.infrastructure.adapters import outbox_event_orm_model  # noqa: F401
+from src.applications.execution.infrastructure.adapters import execution_orm_model  # noqa: F401
 from src.applications.workflow.infrastructure.adapters import workflow_orm_model  # noqa: F401
 from src.auth.shared.infrastructure.sqlalchemy_base import AuthBase
 from tests.applications.fixtures.seed import seed_workflow_data
@@ -45,6 +47,11 @@ def settings(tmp_path: Path) -> Settings:
         messaging_url="amqp://unused",
         messaging_exchange_type="topic",
         applications_trusted_command_producers=("backend.applications.update_status.q",),
+        applications_read_cache_enabled=True,
+        applications_read_cache_redis_url="redis://unused",
+        applications_read_cache_ttl_seconds=5,
+        applications_realtime_enabled=True,
+        applications_realtime_poll_interval_ms=100,
     )
 
 
@@ -84,8 +91,9 @@ def app(settings: Settings, session_factory: sessionmaker[Session]):
 
 
 @pytest.fixture
-def client(app) -> TestClient:
-    return TestClient(app)
+def client(app) -> Iterator[TestClient]:
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 @pytest.fixture

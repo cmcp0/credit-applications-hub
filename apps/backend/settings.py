@@ -44,6 +44,11 @@ class Settings:
     messaging_url: str
     messaging_exchange_type: str
     applications_trusted_command_producers: tuple[str, ...]
+    applications_read_cache_enabled: bool
+    applications_read_cache_redis_url: str
+    applications_read_cache_ttl_seconds: int
+    applications_realtime_enabled: bool
+    applications_realtime_poll_interval_ms: int
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -77,6 +82,17 @@ class Settings:
             applications_trusted_command_producers=_csv_env(
                 "APPLICATIONS_TRUSTED_COMMAND_PRODUCERS",
                 "backend.applications.update_status.q",
+            ),
+            applications_read_cache_enabled=_bool_env("APPLICATIONS_READ_CACHE_ENABLED", True),
+            applications_read_cache_redis_url=os.getenv(
+                "APPLICATIONS_READ_CACHE_REDIS_URL",
+                os.getenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/0"),
+            ),
+            applications_read_cache_ttl_seconds=_int_env("APPLICATIONS_READ_CACHE_TTL_SECONDS", 10),
+            applications_realtime_enabled=_bool_env("APPLICATIONS_REALTIME_ENABLED", True),
+            applications_realtime_poll_interval_ms=_int_env(
+                "APPLICATIONS_REALTIME_POLL_INTERVAL_MS",
+                1000,
             ),
         )
 
