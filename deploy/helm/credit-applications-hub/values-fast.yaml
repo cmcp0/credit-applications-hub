@@ -1,0 +1,36 @@
+# Fast profile for runs (<5m target).
+# Keeps backend + frontend + postgres, disables non-essential services/hooks.
+
+app:
+  rateLimit:
+    enabled: false
+  messaging:
+    enabled: false
+  applications:
+    readCacheEnabled: false
+
+webhooks:
+  enabled: false
+
+mockProvider:
+  enabled: false
+
+workers:
+  enabled: false
+
+jobs:
+  migrate:
+    retries: 10
+    retryDelaySeconds: 1
+  seed:
+    enabled: true
+
+postgres:
+  persistence:
+    enabled: false
+
+redis:
+  enabled: false
+
+rabbitmq:
+  enabled: false
