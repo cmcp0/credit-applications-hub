@@ -7,6 +7,11 @@ from apps.workers.rabbitmq_topology import (
     APPLICATIONS_DLX_EXCHANGE,
     DEFAULT_QUEUE_BINDINGS,
     RabbitMqTopologyManager,
+    WEBHOOKS_COMMANDS_EXCHANGE,
+    WEBHOOKS_DLX_EXCHANGE,
+    WEBHOOKS_EVENTS_EXCHANGE,
+    WORKFLOWS_DLX_EXCHANGE,
+    WORKFLOWS_EVENTS_EXCHANGE,
 )
 
 
@@ -76,3 +81,57 @@ def test_queue_declaration_adds_dlq_and_retry_policy_for_status_update_queue() -
         APPLICATIONS_DLX_EXCHANGE,
         binding.retry_routing_key,
     ) in channel.bindings
+
+
+def test_workflow_execute_binding_uses_workflow_exchanges() -> None:
+    binding = next(
+        item for item in DEFAULT_QUEUE_BINDINGS if item.queue_name == "workers.workflow.execute.q"
+    )
+
+    assert binding.exchange_name == WORKFLOWS_EVENTS_EXCHANGE
+    assert binding.routing_key == "credit.workflow.execution.queued"
+    assert binding.dlx_exchange == WORKFLOWS_DLX_EXCHANGE
+
+    manager = RabbitMqTopologyManager.__new__(RabbitMqTopologyManager)
+    manager._durable = True
+    channel = _RecordingChannel()
+    manager._declare_queue(channel, binding)
+
+    declarations = {queue: (durable, args) for queue, durable, args in channel.declarations}
+    main_queue_args = declarations[binding.queue_name][1]
+    retry_queue_args = declarations[f"{binding.queue_name}.retry"][1]
+
+    assert main_queue_args["x-dead-letter-exchange"] == WORKFLOWS_DLX_EXCHANGE
+    assert main_queue_args["x-dead-letter-routing-key"] == binding.dead_letter_routing_key
+    assert retry_queue_args["x-dead-letter-exchange"] == binding.exchange_name
+    assert retry_queue_args["x-dead-letter-routing-key"] == binding.routing_key
+
+
+def test_webhook_bindings_cover_ingress_delivery_and_replay_queues() -> None:
+    ingress_binding = next(
+        item
+        for item in DEFAULT_QUEUE_BINDINGS
+        if item.queue_name == "workers.webhook.ingress.normalize.q"
+    )
+    deliver_binding = next(
+        item
+        for item in DEFAULT_QUEUE_BINDINGS
+        if item.queue_name == "workers.webhook.egress.deliver.q"
+    )
+    replay_binding = next(
+        item
+        for item in DEFAULT_QUEUE_BINDINGS
+        if item.queue_name == "workers.webhook.egress.replay.q"
+    )
+
+    assert ingress_binding.exchange_name == WEBHOOKS_EVENTS_EXCHANGE
+    assert ingress_binding.routing_key == "credit.webhook.ingress.received"
+    assert ingress_binding.dlx_exchange == WEBHOOKS_DLX_EXCHANGE
+
+    assert deliver_binding.exchange_name == WEBHOOKS_COMMANDS_EXCHANGE
+    assert deliver_binding.routing_key == "credit.webhook.egress.deliver"
+    assert deliver_binding.dlx_exchange == WEBHOOKS_DLX_EXCHANGE
+
+    assert replay_binding.exchange_name == WEBHOOKS_COMMANDS_EXCHANGE
+    assert replay_binding.routing_key == "credit.webhook.egress.replay"
+    assert replay_binding.dlx_exchange == WEBHOOKS_DLX_EXCHANGE

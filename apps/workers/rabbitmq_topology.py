@@ -5,6 +5,12 @@ from dataclasses import dataclass
 APPLICATIONS_EVENTS_EXCHANGE = "applications.events"
 APPLICATIONS_COMMANDS_EXCHANGE = "applications.commands"
 APPLICATIONS_DLX_EXCHANGE = "applications.dlx"
+WORKFLOWS_EVENTS_EXCHANGE = "workflows.events"
+WORKFLOWS_COMMANDS_EXCHANGE = "workflows.commands"
+WORKFLOWS_DLX_EXCHANGE = "workflows.dlx"
+WEBHOOKS_EVENTS_EXCHANGE = "webhooks.events"
+WEBHOOKS_COMMANDS_EXCHANGE = "webhooks.commands"
+WEBHOOKS_DLX_EXCHANGE = "webhooks.dlx"
 
 
 @dataclass(frozen=True)
@@ -14,6 +20,7 @@ class QueueBinding:
     routing_key: str
     dead_letter_routing_key: str
     retry_routing_key: str
+    dlx_exchange: str = APPLICATIONS_DLX_EXCHANGE
     retry_delay_ms: int = 5000
 
 
@@ -41,6 +48,51 @@ DEFAULT_QUEUE_BINDINGS: tuple[QueueBinding, ...] = (
         dead_letter_routing_key="backend.applications.update_status.dead",
         retry_routing_key="backend.applications.update_status.retry",
         retry_delay_ms=10000,
+    ),
+    QueueBinding(
+        queue_name="workers.workflow.execute.q",
+        exchange_name=WORKFLOWS_EVENTS_EXCHANGE,
+        routing_key="credit.workflow.execution.queued",
+        dead_letter_routing_key="workers.workflow.execute.dead",
+        retry_routing_key="workers.workflow.execute.retry",
+        dlx_exchange=WORKFLOWS_DLX_EXCHANGE,
+        retry_delay_ms=5000,
+    ),
+    QueueBinding(
+        queue_name="workers.webhook.ingress.normalize.q",
+        exchange_name=WEBHOOKS_EVENTS_EXCHANGE,
+        routing_key="credit.webhook.ingress.received",
+        dead_letter_routing_key="workers.webhook.ingress.dead",
+        retry_routing_key="workers.webhook.ingress.retry",
+        dlx_exchange=WEBHOOKS_DLX_EXCHANGE,
+        retry_delay_ms=2000,
+    ),
+    QueueBinding(
+        queue_name="workers.webhook.egress.deliver.q",
+        exchange_name=WEBHOOKS_COMMANDS_EXCHANGE,
+        routing_key="credit.webhook.egress.deliver",
+        dead_letter_routing_key="workers.webhook.egress.deliver.dead",
+        retry_routing_key="workers.webhook.egress.deliver.retry",
+        dlx_exchange=WEBHOOKS_DLX_EXCHANGE,
+        retry_delay_ms=5000,
+    ),
+    QueueBinding(
+        queue_name="workers.webhook.egress.replay.q",
+        exchange_name=WEBHOOKS_COMMANDS_EXCHANGE,
+        routing_key="credit.webhook.egress.replay",
+        dead_letter_routing_key="workers.webhook.egress.replay.dead",
+        retry_routing_key="workers.webhook.egress.replay.retry",
+        dlx_exchange=WEBHOOKS_DLX_EXCHANGE,
+        retry_delay_ms=5000,
+    ),
+    QueueBinding(
+        queue_name="backend.workflow.execution.projection.q",
+        exchange_name=WORKFLOWS_EVENTS_EXCHANGE,
+        routing_key="credit.workflow.execution.*",
+        dead_letter_routing_key="backend.workflow.execution.projection.dead",
+        retry_routing_key="backend.workflow.execution.projection.retry",
+        dlx_exchange=WORKFLOWS_DLX_EXCHANGE,
+        retry_delay_ms=5000,
     ),
 )
 
@@ -84,6 +136,36 @@ class RabbitMqTopologyManager:
                 exchange_type=self._exchange_type,
                 durable=self._durable,
             )
+            channel.exchange_declare(
+                exchange=WORKFLOWS_EVENTS_EXCHANGE,
+                exchange_type=self._exchange_type,
+                durable=self._durable,
+            )
+            channel.exchange_declare(
+                exchange=WORKFLOWS_COMMANDS_EXCHANGE,
+                exchange_type=self._exchange_type,
+                durable=self._durable,
+            )
+            channel.exchange_declare(
+                exchange=WORKFLOWS_DLX_EXCHANGE,
+                exchange_type=self._exchange_type,
+                durable=self._durable,
+            )
+            channel.exchange_declare(
+                exchange=WEBHOOKS_EVENTS_EXCHANGE,
+                exchange_type=self._exchange_type,
+                durable=self._durable,
+            )
+            channel.exchange_declare(
+                exchange=WEBHOOKS_COMMANDS_EXCHANGE,
+                exchange_type=self._exchange_type,
+                durable=self._durable,
+            )
+            channel.exchange_declare(
+                exchange=WEBHOOKS_DLX_EXCHANGE,
+                exchange_type=self._exchange_type,
+                durable=self._durable,
+            )
 
             for binding in self._queue_bindings:
                 self._declare_queue(channel, binding)
@@ -97,7 +179,7 @@ class RabbitMqTopologyManager:
         channel.queue_declare(queue=dlq_name, durable=self._durable)
         channel.queue_bind(
             queue=dlq_name,
-            exchange=APPLICATIONS_DLX_EXCHANGE,
+            exchange=binding.dlx_exchange,
             routing_key=binding.dead_letter_routing_key,
         )
 
@@ -112,7 +194,7 @@ class RabbitMqTopologyManager:
         )
         channel.queue_bind(
             queue=retry_queue_name,
-            exchange=APPLICATIONS_DLX_EXCHANGE,
+            exchange=binding.dlx_exchange,
             routing_key=binding.retry_routing_key,
         )
 
@@ -120,7 +202,7 @@ class RabbitMqTopologyManager:
             queue=binding.queue_name,
             durable=self._durable,
             arguments={
-                "x-dead-letter-exchange": APPLICATIONS_DLX_EXCHANGE,
+                "x-dead-letter-exchange": binding.dlx_exchange,
                 "x-dead-letter-routing-key": binding.dead_letter_routing_key,
             },
         )
