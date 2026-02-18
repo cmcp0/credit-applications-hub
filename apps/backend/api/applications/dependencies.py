@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from apps.backend.auth.dependencies import get_db_session, get_settings
@@ -24,6 +24,13 @@ from src.applications.application.domain.ports.outbox_event_writer import Outbox
 from src.applications.application.domain.ports.status_history_repository import StatusHistoryRepository
 from src.applications.application.infrastructure.adapters.application_read_repository import (
     SqlAlchemyApplicationReadRepository,
+)
+from src.applications.application.infrastructure.adapters.application_list_cache import (
+    ApplicationListCache,
+    build_application_list_cache,
+)
+from src.applications.application.infrastructure.adapters.cached_application_read_repository import (
+    CachedApplicationReadRepository,
 )
 from src.applications.application.infrastructure.adapters.application_repository import (
     SqlAlchemyApplicationRepository,
@@ -71,10 +78,34 @@ def get_application_repository(
 
 
 def get_application_read_repository(
+    settings: Annotated[Settings, Depends(get_settings)],
     db_session: Annotated[Session, Depends(get_db_session)],
     workflow_repository: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
+    list_cache: Annotated[ApplicationListCache, Depends(get_application_list_cache)],
 ) -> ApplicationReadRepository:
-    return SqlAlchemyApplicationReadRepository(db_session, workflow_repository)
+    base_repository = SqlAlchemyApplicationReadRepository(db_session, workflow_repository)
+    if not settings.applications_read_cache_enabled:
+        return base_repository
+
+    return CachedApplicationReadRepository(
+        delegate=base_repository,
+        list_cache=list_cache,
+    )
+
+
+def get_application_list_cache(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ApplicationListCache:
+    cache = getattr(request.app.state, "application_list_cache", None)
+    if cache is None:
+        cache = build_application_list_cache(
+            enabled=settings.applications_read_cache_enabled,
+            redis_url=settings.applications_read_cache_redis_url,
+            ttl_seconds=settings.applications_read_cache_ttl_seconds,
+        )
+        request.app.state.application_list_cache = cache
+    return cache
 
 
 def get_status_history_repository(
